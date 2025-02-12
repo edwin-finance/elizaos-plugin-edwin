@@ -69,11 +69,11 @@ async function getEdwinActions({
           runtime,
           responseContext
         );
-        callback?.({ text: response, content: result });
+        callback == null ? void 0 : callback({ text: response, content: result });
         return true;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        callback?.({
+        callback == null ? void 0 : callback({
           text: `Error executing action ${action.name}: ${errorMessage}`,
           content: { error: errorMessage }
         });
