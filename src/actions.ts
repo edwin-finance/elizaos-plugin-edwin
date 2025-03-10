@@ -7,10 +7,10 @@ import {
     ModelClass,
     type State,
     composeContext,
-    generateObjectDeprecated,
+    generateObject,
 } from "@elizaos/core";
 
-import { Edwin, EdwinAction } from "edwin-sdk";
+import { Edwin, EdwinTool, generateToolParametersPrompt } from "edwin-sdk";
 
 type GetEdwinActionsParams = {
     getClient: () => Promise<Edwin>;
@@ -19,14 +19,12 @@ type GetEdwinActionsParams = {
 /**
  * Get all edwin actions
  */
-export async function getEdwinActions({
-    getClient,
-}: GetEdwinActionsParams): Promise<Action[]> {
+export async function getEdwinActions({ getClient }: GetEdwinActionsParams): Promise<Action[]> {
     const edwin = await getClient();
-    const edwinActions = await edwin.getActions();
-    const actions = edwinActions.map((action: EdwinAction) => ({
-        name: action.name.toUpperCase(),
-        description: action.description,
+    const edwinTools = await edwin.getTools();
+    const actions = Object.values(edwinTools).map((tool: EdwinTool) => ({
+        name: tool.name.toUpperCase(),
+        description: tool.description,
         similes: [],
         validate: async () => true,
         handler: async (
@@ -45,30 +43,23 @@ export async function getEdwinActions({
                 }
                 const parameterContext = composeContext({
                     state,
-                    template: action.template,
+                    template: generateToolParametersPrompt(tool),
                 });
-                const parameters = await generateObjectDeprecated({
+                const parameters = await generateObject({
                     runtime,
                     context: parameterContext,
                     modelClass: ModelClass.LARGE,
                 });
-                const result = await executeAction(action, parameters, client);
-                const responseContext = composeResponseContext(
-                    action,
-                    result,
-                    state
-                );
-                const response = await generateResponse(
-                    runtime,
-                    responseContext
-                );
+                const result = await tool.execute(parameters);
+                const responseContext = composeResponseContext(tool, result, state);
+                const response = await generateResponse(runtime, responseContext);
                 callback?.({ text: response, content: result });
                 return true;
             } catch (error) {
                 const errorMessage =
                     error instanceof Error ? error.message : String(error);
                 callback?.({
-                    text: `Error executing action ${action.name}: ${errorMessage}`,
+                    text: `Error executing action ${tool.name}: ${errorMessage}`,
                     content: { error: errorMessage },
                 });
                 return false;
@@ -79,17 +70,8 @@ export async function getEdwinActions({
     return actions;
 }
 
-async function executeAction(
-    action: EdwinAction,
-    parameters: any,
-    edwin: Edwin
-): Promise<unknown> {
-    const result = await action.execute(parameters);
-    return result;
-}
-
 function composeResponseContext(
-    action: EdwinAction,
+    tool: EdwinTool,
     result: unknown,
     state: State
 ): string {
@@ -112,7 +94,7 @@ About {{agentName}}:
 # Capabilities
 Note that {{agentName}} is capable of reading/seeing/hearing various forms of media, including images, videos, audio, plaintext and PDFs. Recent attachments have been included above under the "Attachments" section.
 
-The action "${action.name}" was executed successfully.
+The action "${tool.name}" was executed successfully.
 Here is the result:
 ${JSON.stringify(result)}
 

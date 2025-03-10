@@ -1,4 +1,4 @@
-// src/provider.ts
+// src/client.ts
 import { Edwin } from "edwin-sdk";
 var edwinRunningInstance = null;
 async function getEdwinClient() {
@@ -7,12 +7,13 @@ async function getEdwinClient() {
   }
   const edwinConfig = {
     evmPrivateKey: process.env.EVM_PRIVATE_KEY,
-    solanaPrivateKey: process.env.SOLANA_PRIVATE_KEY,
-    actions: ["supply", "withdraw", "stake", "getPools", "addLiquidity"]
+    solanaPrivateKey: process.env.SOLANA_PRIVATE_KEY
   };
   edwinRunningInstance = new Edwin(edwinConfig);
   return edwinRunningInstance;
 }
+
+// src/provider.ts
 var edwinProvider = {
   async get(runtime) {
     try {
@@ -32,14 +33,13 @@ import {
   composeContext,
   generateObjectDeprecated
 } from "@elizaos/core";
-async function getEdwinActions({
-  getClient
-}) {
+import { generateToolParametersPrompt } from "edwin-sdk";
+async function getEdwinActions({ getClient }) {
   const edwin = await getClient();
-  const edwinActions = await edwin.getActions();
-  const actions = edwinActions.map((action) => ({
-    name: action.name.toUpperCase(),
-    description: action.description,
+  const edwinTools = await edwin.getTools();
+  const actions = Object.values(edwinTools).map((tool) => ({
+    name: tool.name.toUpperCase(),
+    description: tool.description,
     similes: [],
     validate: async () => true,
     handler: async (runtime, message, state, options, callback) => {
@@ -52,16 +52,16 @@ async function getEdwinActions({
         }
         const parameterContext = composeContext({
           state,
-          template: action.template
+          template: generateToolParametersPrompt(tool)
         });
         const parameters = await generateObjectDeprecated({
           runtime,
           context: parameterContext,
           modelClass: ModelClass.LARGE
         });
-        const result = await executeAction(action, parameters, client);
+        const result = await executeAction(tool, parameters, client);
         const responseContext = composeResponseContext(
-          action,
+          tool,
           result,
           state
         );
@@ -69,12 +69,12 @@ async function getEdwinActions({
           runtime,
           responseContext
         );
-        callback == null ? void 0 : callback({ text: response, content: result });
+        callback?.({ text: response, content: result });
         return true;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        callback == null ? void 0 : callback({
-          text: `Error executing action ${action.name}: ${errorMessage}`,
+        callback?.({
+          text: `Error executing action ${tool.name}: ${errorMessage}`,
           content: { error: errorMessage }
         });
         return false;
@@ -84,11 +84,11 @@ async function getEdwinActions({
   }));
   return actions;
 }
-async function executeAction(action, parameters, edwin) {
-  const result = await action.execute(parameters);
+async function executeAction(tool, parameters, edwin) {
+  const result = await tool.execute(parameters);
   return result;
 }
-function composeResponseContext(action, result, state) {
+function composeResponseContext(tool, result, state) {
   const responseTemplate = `
 # Action Examples
 {{actionExamples}}
@@ -108,7 +108,7 @@ About {{agentName}}:
 # Capabilities
 Note that {{agentName}} is capable of reading/seeing/hearing various forms of media, including images, videos, audio, plaintext and PDFs. Recent attachments have been included above under the "Attachments" section.
 
-The action "${action.name}" was executed successfully.
+The action "${tool.name}" was executed successfully.
 Here is the result:
 ${JSON.stringify(result)}
 

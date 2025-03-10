@@ -1,5 +1,6 @@
 import type { Plugin } from "@elizaos/core";
-import { edwinProvider, getEdwinClient } from "./provider";
+import { edwinProvider } from "./provider";
+import { getEdwinClient } from "./client";
 import { getEdwinActions } from "./actions";
 
 // Initial banner
