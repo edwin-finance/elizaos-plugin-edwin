@@ -49,8 +49,12 @@ export async function getEdwinActions({ getClient }: GetEdwinActionsParams): Pro
                     runtime,
                     context: parameterContext,
                     modelClass: ModelClass.LARGE,
+                    schema: tool.schema,
                 });
-                const result = await tool.execute(parameters);
+                if (!parameters.object) {
+                    throw new Error(`No parameters generated for tool ${tool.name}`);
+                }
+                const result = await tool.execute(parameters.object);
                 const responseContext = composeResponseContext(tool, result, state);
                 const response = await generateResponse(runtime, responseContext);
                 callback?.({ text: response, content: result });
