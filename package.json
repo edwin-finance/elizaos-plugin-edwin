@@ -6,7 +6,7 @@
     "type": "module",
     "types": "dist/index.d.ts",
     "dependencies": {
-        "edwin-sdk": "^0.8.7",
+        "edwin-sdk": "^0.8.10",
         "tsup": "8.3.5"
     },
     "scripts": {
