@@ -6,6 +6,7 @@
     "type": "module",
     "types": "dist/index.d.ts",
     "dependencies": {
+        "@elizaos/core": "workspace:^",
         "edwin-sdk": "^0.8.7",
         "tsup": "8.3.5"
     },
